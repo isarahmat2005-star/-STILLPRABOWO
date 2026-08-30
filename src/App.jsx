@@ -204,7 +204,7 @@ function App() {
                 {/* Loading Indicator Overlay */}
                 {isProcessing && (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10 backdrop-blur-sm">
-                    <span className="text-red-600 font-bold animate-pulse text-center px-2 text-lg">Memproses dengan AI...</span>
+                    <span className="text-red-600 font-bold animate-pulse text-center px-2 text-lg">Memproses...</span>
                   </div>
                 )}
 
