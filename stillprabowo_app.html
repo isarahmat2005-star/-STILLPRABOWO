@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>#STILLPRABOWO</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Share+Tech&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Share Tech', sans-serif;
+            /* Latar belakang putih dengan grid kotak-kotak merah */
+            background-color: #ffffff;
+            background-image: 
+                linear-gradient(to right, rgba(220, 38, 38, 0.15) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(220, 38, 38, 0.15) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+        .app-container {
+            min-height: 100vh;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="app-container flex items-center justify-center py-10 px-4">
+        <!-- Main Card -->
+        <div class="bg-white max-w-md w-full rounded-2xl shadow-2xl overflow-hidden border-2 border-red-600 relative z-10">
+            
+            <!-- Header Section -->
+            <div class="bg-red-600 text-white text-center py-6 px-4 relative overflow-hidden">
+                <div class="flex justify-center mb-3 relative z-10">
+                    <img src="https://ik.imagekit.io/oteii8rqh0/IMG_20260830_121543.webp" 
+                         alt="Profile" 
+                         class="w-32 h-32 rounded-full object-cover border-4 border-white shadow-md">
+                </div>
+                <h1 class="text-3xl font-bold tracking-wider relative z-10">#STILLPRABOWO</h1>
+                
+                <!-- Dekorasi latar header -->
+                <div class="absolute -bottom-10 -right-10 w-32 h-32 bg-red-500 rounded-full opacity-50 blur-xl"></div>
+                <div class="absolute -top-10 -left-10 w-32 h-32 bg-red-700 rounded-full opacity-50 blur-xl"></div>
+            </div>
+
+            <!-- Content Section -->
+            <div class="p-6">
+                <!-- Upload Area -->
+                <div class="mb-6">
+                    <label for="imageUpload" class="block w-full cursor-pointer bg-red-50 hover:bg-red-100 border-2 border-dashed border-red-400 text-red-700 text-center py-8 px-4 rounded-xl transition duration-300">
+                        <svg class="mx-auto h-12 w-12 mb-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        <span class="text-lg font-bold block">Upload Foto Anda Untuk menjadi bagian #stillprabowo</span>
+                        <input type="file" id="imageUpload" class="hidden" accept="image/*">
+                    </label>
+                </div>
+
+                <!-- Editor/Preview Area (Always visible now) -->
+                <div id="editorArea" class="flex flex-col items-center">
+                    <div class="relative w-64 h-64 mb-6 rounded-xl overflow-hidden border-2 border-gray-200 shadow-inner bg-gray-50">
+                        <!-- Loading Indicator Overlay -->
+                        <div id="loadingIndicator" class="absolute inset-0 flex items-center justify-center bg-white/90 z-10 hidden backdrop-blur-sm">
+                            <span id="loadingText" class="text-red-600 font-bold animate-pulse text-center px-2 text-lg">Memproses dengan AI...</span>
+                        </div>
+                        <canvas id="canvas" class="w-full h-full object-cover"></canvas>
+                    </div>
+
+                    <!-- Download Button (Disabled and gray by default) -->
+                    <button id="downloadBtn" disabled class="w-full bg-gray-400 text-gray-100 cursor-not-allowed font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md flex justify-center items-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Download Hasil
+                    </button>
+                </div>
+            </div>
+
+            <!-- Footer / Support Section -->
+            <div class="bg-gray-50 p-6 border-t border-gray-200 text-center">
+                <p class="text-gray-600 text-sm mb-3 font-bold">Dukung Project Kuali Merah Putih untuk membantu saudara kita yg membutuhkan</p>
+                <a href="https://saweria.co/bobonsantoso" target="_blank" rel="noopener noreferrer" class="inline-block w-full bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 font-bold py-3 px-4 rounded-xl transition duration-300 shadow-sm flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clip-rule="evenodd"></path></svg>
+                    Support Bobon Santoso
+                </a>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const imageUpload = document.getElementById('imageUpload');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const loadingText = document.getElementById('loadingText');
+
+        // Output resolusi gambar 1:1
+        const CANVAS_SIZE = 500; 
+        canvas.width = CANVAS_SIZE;
+        canvas.height = CANVAS_SIZE;
+
+        // Fungsi untuk menggambar state awal kanvas kosong
+        function drawEmptyState() {
+            ctx.fillStyle = "#f9fafb";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#9ca3af";
+            ctx.font = "24px 'Share Tech'";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("Area Hasil", canvas.width / 2, canvas.height / 2 - 15);
+            ctx.font = "16px 'Share Tech'";
+            ctx.fillText("Upload foto di atas", canvas.width / 2, canvas.height / 2 + 15);
+        }
+
+        // Panggil saat pertama kali halaman dimuat
+        drawEmptyState();
+
+        // Fungsi untuk mengatur tampilan tombol download
+        function setDownloadState(isEnabled) {
+            if (isEnabled) {
+                downloadBtn.disabled = false;
+                downloadBtn.className = "w-full bg-red-600 hover:bg-red-700 text-white cursor-pointer font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md flex justify-center items-center gap-2";
+            } else {
+                downloadBtn.disabled = true;
+                downloadBtn.className = "w-full bg-gray-400 text-gray-100 cursor-not-allowed font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md flex justify-center items-center gap-2";
+            }
+        }
+
+        // Mengatur event listener ketika file dipilih
+        imageUpload.addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            // Matikan tombol download saat proses berjalan
+            setDownloadState(false);
+            
+            // Atur status loading
+            loadingIndicator.classList.remove('hidden');
+            loadingText.innerText = "Memproses dengan AI...";
+            loadingText.classList.add('animate-pulse');
+            loadingText.classList.remove('text-red-800');
+            loadingText.classList.add('text-red-600');
+            
+            // Kosongkan canvas dari hasil sebelumnya
+            drawEmptyState();
+
+            try {
+                // Baca file sebagai Base64
+                const base64Data = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result);
+                    reader.readAsDataURL(file);
+                });
+                
+                // Pisahkan header base64 (data:image/jpeg;base64,...) dari data utamanya
+                const mimeType = file.type || 'image/jpeg';
+                const base64String = base64Data.split(',')[1];
+                
+                // Panggil fungsi AI
+                const resultBase64 = await generateAIImage(mimeType, base64String);
+                
+                // Gambar hasilnya ke Canvas (dengan crop 1:1)
+                const img = new Image();
+                img.onload = function() {
+                    const size = Math.min(img.width, img.height);
+                    const startX = (img.width - size) / 2;
+                    const startY = (img.height - size) / 2;
+
+                    ctx.fillStyle = "white";
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, startX, startY, size, size, 0, 0, canvas.width, canvas.height);
+                    
+                    // Sembunyikan loading dan aktifkan tombol download
+                    loadingIndicator.classList.add('hidden');
+                    setDownloadState(true);
+                }
+                img.src = resultBase64;
+                
+            } catch (error) {
+                console.error("AI Error:", error);
+                loadingText.innerText = "Gagal memproses gambar. Silakan coba file lain.";
+                loadingText.classList.remove('animate-pulse');
+                loadingText.classList.remove('text-red-600');
+                loadingText.classList.add('text-red-800');
+                setDownloadState(false); // Pastikan tetap non-aktif jika gagal
+            }
+        });
+
+        // Fungsi memanggil API Gemini
+        async function generateAIImage(mimeType, base64String) {
+            const apiKey = "";
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`;
+            
+            const payload = {
+                contents: [{
+                    parts: [
+                        { text: "Convert this photo into a high contrast black and white stencil art style. Make it solid black and white only, no gray tones." },
+                        { inlineData: { mimeType: mimeType, data: base64String } }
+                    ]
+                }],
+                generationConfig: {
+                    responseModalities: ["TEXT", "IMAGE"]
+                }
+            };
+
+            let retries = 0;
+            const delays = [1000, 2000, 4000, 8000]; // Exponential backoff
+            while (retries < 4) {
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    const result = await response.json();
+                    
+                    const outBase64 = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+                    if (!outBase64) throw new Error("No image generated");
+                    return `data:image/jpeg;base64,${outBase64}`;
+                } catch (e) {
+                    if (retries === 3) throw e;
+                    await new Promise(r => setTimeout(r, delays[retries]));
+                    retries++;
+                }
+            }
+        }
+
+        downloadBtn.addEventListener('click', function() {
+            if (this.disabled) return;
+            const link = document.createElement('a');
+            link.download = 'STILLPRABOWO-Avatar.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+    </script>
+</body>
+</html>
