@@ -40,7 +40,13 @@ function App() {
 
     // Jalankan saat komponen pertama kali dirender
     drawEmptyState();
-
+    Promise.all([
+      document.fonts.load("24px 'Share Tech'"),
+      document.fonts.load("16px 'Share Tech'")
+    ]).then(() => {
+      drawEmptyState();
+    }).catch(() => {
+    
     // Listener untuk menerima balasan (postMessage) dari HTML Gateway
     const handleMessage = (event) => {
       const data = event.data;
@@ -196,7 +202,7 @@ function App() {
                 {/* Loading Indicator Overlay */}
                 {isProcessing && (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10 backdrop-blur-sm">
-                    <span className="text-red-600 font-bold animate-pulse text-center px-2 text-lg">Memproses dengan AI...</span>
+                    <span className="text-red-600 font-bold animate-pulse text-center px-2 text-lg">Memproses...</span>
                   </div>
                 )}
                 
