@@ -33,6 +33,11 @@ function App() {
   };
 
   useEffect(() => {
+    const link = document.createElement('link');
+    link.href = 'https://fonts.googleapis.com/css2?family=Share+Tech&display=swap';
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+
     // Jalankan saat komponen pertama kali dirender
     drawEmptyState();
 
