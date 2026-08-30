@@ -8,6 +8,7 @@ function App() {
   const [resultImage, setResultImage] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [lastUpload, setLastUpload] = useState(null); // { base64Data, mimeType } - disimpan di latar belakang untuk fitur ulangi
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
   const CANVAS_SIZE = 500;
@@ -82,7 +83,7 @@ function App() {
       const payload = {
         contents: [{
             parts: [
-                { text: "Convert this photo into a high contrast black and white stencil art style. Make it solid black and white only, no gray tones." },
+                { text: "Convert this photo into a high contrast black and white vector stencil art illustration. Keep only the main subject rendered in solid black and white — no gray tones, no gradients, no halftone dots. The background must be pure solid white (#FFFFFF), completely clean and empty, with no shadows, texture, or background elements. The subject should look like a clean flat vector graphic with crisp, well-defined edges, similar to a stencil or screen-print silhouette design." },
                 { inlineData: { mimeType: mimeType, data: base64String } }
             ]
         }],
@@ -125,9 +126,11 @@ function App() {
     }
   };
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+  const processFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) {
+      setErrorMsg("File yang diupload harus berupa gambar.");
+      return;
+    }
 
     setResultImage(null);
     drawEmptyState(); // Bersihkan kanvas lama
@@ -148,9 +151,36 @@ function App() {
     } catch (err) {
       console.error("Gagal membaca file:", err);
       setErrorMsg("Gagal membaca file.");
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    await processFile(file);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isProcessing) setIsDragging(true);
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (isProcessing) return;
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    await processFile(file);
   };
 
   const handleRetry = () => {
@@ -198,13 +228,20 @@ function App() {
             <div className="mb-6">
               <label 
                 htmlFor="imageUpload" 
-                className={`block w-full cursor-pointer bg-red-50 hover:bg-red-100 border-2 border-dashed ${errorMsg ? 'border-red-600' : 'border-red-400'} text-red-700 text-center py-4 px-4 rounded-xl transition duration-300`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                className={`block w-full cursor-pointer border-2 border-dashed text-red-700 text-center py-4 px-4 rounded-xl transition duration-300 ${
+                  isDragging
+                    ? 'bg-red-100 border-red-600'
+                    : `bg-red-50 hover:bg-red-100 ${errorMsg ? 'border-red-600' : 'border-red-400'}`
+                }`}
               >
                 <svg className="mx-auto h-12 w-12 mb-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
                 </svg>
                 <span className="text-lg font-bold block">
-                  {errorMsg ? "Gagal memproses. Coba foto lain." : "Upload foto anda"}
+                  {isDragging ? "Lepaskan file di sini" : errorMsg ? "Gagal memproses. Coba foto lain." : "Upload foto anda"}
                 </span>
                 <input 
                   type="file" 
