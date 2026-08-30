@@ -46,6 +46,7 @@ function App() {
     ]).then(() => {
       drawEmptyState();
     }).catch(() => {
+    });
     
     // Listener untuk menerima balasan (postMessage) dari HTML Gateway
     const handleMessage = (event) => {
