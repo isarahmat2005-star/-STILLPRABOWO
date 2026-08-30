@@ -16,22 +16,13 @@ function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    
-    // Set ukuran asli (internal resolusi)
+  
     canvas.width = CANVAS_SIZE;
     canvas.height = CANVAS_SIZE;
 
     ctx.fillStyle = "#f9fafb";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = "#9ca3af";
-    ctx.font = "24px 'Share Tech', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText("Area Hasil", canvas.width / 2, canvas.height / 2 - 15);
-    ctx.font = "16px 'Share Tech', sans-serif";
-    ctx.fillText("Upload foto di atas", canvas.width / 2, canvas.height / 2 + 15);
   };
-
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Share+Tech&display=swap';
@@ -205,6 +196,12 @@ function App() {
                   <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10 backdrop-blur-sm">
                     <span className="text-red-600 font-bold animate-pulse text-center px-2 text-lg">Memproses...</span>
                   </div>
+                )}
+
+                {!isProcessing && !resultImage && (
+                   <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10">
+                     <span className="text-red-600 font-bold text-center px-2 text-lg">Upload file terlebih dahulu</span>
+                   </div>
                 )}
                 
                 {/* Canvas (selalu ada) */}
