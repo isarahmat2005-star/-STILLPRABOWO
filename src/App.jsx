@@ -16,20 +16,51 @@ function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-  
+    
+    // Set ukuran asli (internal resolusi)
     canvas.width = CANVAS_SIZE;
     canvas.height = CANVAS_SIZE;
 
     ctx.fillStyle = "#f9fafb";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   };
+
+  // Sama persis dengan utils.js milik tetangga: postMessage dibungkus Promise agar bisa di-await
+  const callGeminiApiViaProxy = (endpointPath, payload) => {
+    return new Promise((resolve, reject) => {
+      const id = Math.random().toString(36).substring(2, 15);
+
+      const handleMessage = (event) => {
+        const data = event.data;
+        if (data && data.type === 'GEMINI_RESPONSE' && data.id === id) {
+          window.removeEventListener('message', handleMessage);
+          if (data.success) {
+            resolve(data.data);
+          } else {
+            reject(new Error(data.error));
+          }
+        }
+      };
+
+      window.addEventListener('message', handleMessage);
+
+      // Kirim tugas (pesan) ke Parent (Iframe Wrapper HTML)
+      window.parent.postMessage({
+        type: 'CALL_GEMINI',
+        id: id,
+        endpointPath: endpointPath,
+        payload: payload
+      }, '*');
+    });
+  };
+
   useEffect(() => {
     const link = document.createElement('link');
     link.href = 'https://fonts.googleapis.com/css2?family=Share+Tech&display=swap';
     link.rel = 'stylesheet';
     document.head.appendChild(link);
 
-    // Jalankan saat komponen pertama kali dirender
+    // Gambar dulu dengan font fallback, lalu redraw begitu font Share Tech selesai load
     drawEmptyState();
     Promise.all([
       document.fonts.load("24px 'Share Tech'"),
@@ -37,56 +68,11 @@ function App() {
     ]).then(() => {
       drawEmptyState();
     }).catch(() => {
+      // Kalau gagal load font, biarkan fallback sans-serif tetap tampil
     });
-    
-    // Listener untuk menerima balasan (postMessage) dari HTML Gateway
-    const handleMessage = (event) => {
-      const data = event.data;
-      if (data && data.type === 'GEMINI_RESPONSE' && data.id === 'generate-stencil') {
-        if (data.success) {
-          try {
-             // Ekstrak data base64 dari response Gemini
-             const outBase64 = data.data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-             if (!outBase64) throw new Error("Tidak ada gambar yang dihasilkan oleh AI.");
-             
-             const resultBase64Data = `data:image/jpeg;base64,${outBase64}`;
-             
-             // Gambar ke kanvas
-             const img = new Image();
-             img.onload = () => {
-                 const canvas = canvasRef.current;
-                 const ctx = canvas.getContext('2d');
-                 const size = Math.min(img.width, img.height);
-                 const startX = (img.width - size) / 2;
-                 const startY = (img.height - size) / 2;
-
-                 ctx.fillStyle = "white";
-                 ctx.fillRect(0, 0, canvas.width, canvas.height);
-                 ctx.drawImage(img, startX, startY, size, size, 0, 0, canvas.width, canvas.height);
-                 
-                 setResultImage(canvas.toDataURL('image/png'));
-                 setIsProcessing(false);
-             };
-             img.src = resultBase64Data;
-
-          } catch (err) {
-            console.error("Gagal parsing hasil:", err);
-            setErrorMsg("Gagal memproses hasil dari AI.");
-            setIsProcessing(false);
-          }
-        } else {
-          console.error("API Error:", data.error);
-          setErrorMsg(data.error || "Terjadi kesalahan pada AI.");
-          setIsProcessing(false);
-        }
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
-  const handleFileChange = (e) => {
+  const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -95,13 +81,17 @@ function App() {
     setErrorMsg(null);
     drawEmptyState(); // Bersihkan kanvas lama
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64Data = event.target.result;
+    try {
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
       const mimeType = file.type || 'image/jpeg';
       const base64String = base64Data.split(',')[1];
-      
-      // Susun payload untuk Gemini
+
       const payload = {
         contents: [{
             parts: [
@@ -114,19 +104,39 @@ function App() {
         }
       };
 
-      // Kirim request ke parent (HTML Gateway di Canvas)
-      window.parent.postMessage({
-        type: 'CALL_GEMINI',
-        id: 'generate-stencil',
-        // Menggunakan endpoint path sesuai setup Gateway baru
-        endpointPath: 'gemini-3.1-flash-image:generateContent',
-        payload: payload
-      }, '*');
-    };
-    
-    reader.readAsDataURL(file);
-    // Reset nilai input file agar file yang sama bisa di-upload ulang
-    if(fileInputRef.current) fileInputRef.current.value = ""; 
+      // Panggil AI langsung (bukan lewat postMessage ke parent)
+      const result = await callGeminiApiViaProxy('gemini-3.1-flash-image:generateContent', payload);
+
+      const outBase64 = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      if (!outBase64) throw new Error("Tidak ada gambar yang dihasilkan oleh AI.");
+
+      const resultBase64Data = `data:image/jpeg;base64,${outBase64}`;
+
+      const img = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = resultBase64Data;
+      });
+
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
+      const size = Math.min(img.width, img.height);
+      const startX = (img.width - size) / 2;
+      const startY = (img.height - size) / 2;
+
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, startX, startY, size, size, 0, 0, canvas.width, canvas.height);
+
+      setResultImage(canvas.toDataURL('image/png'));
+    } catch (err) {
+      console.error("Gagal memproses:", err);
+      setErrorMsg(err.message || "Terjadi kesalahan pada AI.");
+    } finally {
+      setIsProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleDownload = () => {
@@ -194,14 +204,15 @@ function App() {
                 {/* Loading Indicator Overlay */}
                 {isProcessing && (
                   <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10 backdrop-blur-sm">
-                    <span className="text-red-600 font-bold animate-pulse text-center px-2 text-lg">Memproses...</span>
+                    <span className="text-red-600 font-bold animate-pulse text-center px-2 text-lg">Memproses dengan AI...</span>
                   </div>
                 )}
 
+                {/* Empty State Overlay */}
                 {!isProcessing && !resultImage && (
-                   <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10">
-                     <span className="text-red-600 font-bold text-center px-2 text-lg">Upload file terlebih dahulu</span>
-                   </div>
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10">
+                    <span className="text-red-600 font-bold text-center px-2 text-lg">Upload file terlebih dahulu</span>
+                  </div>
                 )}
                 
                 {/* Canvas (selalu ada) */}
