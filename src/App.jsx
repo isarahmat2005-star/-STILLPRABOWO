@@ -7,6 +7,7 @@ function App() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [resultImage, setResultImage] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
+  const [lastUpload, setLastUpload] = useState(null); // { base64Data, mimeType } - disimpan di latar belakang untuk fitur ulangi
   const fileInputRef = useRef(null);
   const canvasRef = useRef(null);
   const CANVAS_SIZE = 500;
@@ -16,8 +17,7 @@ function App() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    
-    // Set ukuran asli (internal resolusi)
+  
     canvas.width = CANVAS_SIZE;
     canvas.height = CANVAS_SIZE;
 
@@ -60,7 +60,7 @@ function App() {
     link.rel = 'stylesheet';
     document.head.appendChild(link);
 
-    // Gambar dulu dengan font fallback, lalu redraw begitu font Share Tech selesai load
+    // Jalankan saat komponen pertama kali dirender
     drawEmptyState();
     Promise.all([
       document.fonts.load("24px 'Share Tech'"),
@@ -68,30 +68,17 @@ function App() {
     ]).then(() => {
       drawEmptyState();
     }).catch(() => {
-      // Kalau gagal load font, biarkan fallback sans-serif tetap tampil
     });
   }, []);
 
-  const handleFileChange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
+  const processImage = async (base64Data, mimeType) => {
     setIsProcessing(true);
-    setResultImage(null);
     setErrorMsg(null);
-    drawEmptyState(); // Bersihkan kanvas lama
 
     try {
-      const base64Data = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (event) => resolve(event.target.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-
-      const mimeType = file.type || 'image/jpeg';
       const base64String = base64Data.split(',')[1];
 
+      // Susun payload untuk Gemini
       const payload = {
         contents: [{
             parts: [
@@ -104,7 +91,7 @@ function App() {
         }
       };
 
-      // Panggil AI langsung (bukan lewat postMessage ke parent)
+      // Panggil AI langsung, tunggu hasilnya dengan await
       const result = await callGeminiApiViaProxy('gemini-3.1-flash-image:generateContent', payload);
 
       const outBase64 = result.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
@@ -135,8 +122,42 @@ function App() {
       setErrorMsg(err.message || "Terjadi kesalahan pada AI.");
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setResultImage(null);
+    drawEmptyState(); // Bersihkan kanvas lama
+
+    try {
+      const base64Data = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => resolve(event.target.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+
+      const mimeType = file.type || 'image/jpeg';
+      // Simpan di latar belakang supaya bisa dipakai lagi lewat tombol ulangi
+      setLastUpload({ base64Data, mimeType });
+
+      await processImage(base64Data, mimeType);
+    } catch (err) {
+      console.error("Gagal membaca file:", err);
+      setErrorMsg("Gagal membaca file.");
+    } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  };
+
+  const handleRetry = () => {
+    if (!lastUpload || isProcessing) return;
+    setResultImage(null);
+    drawEmptyState();
+    processImage(lastUpload.base64Data, lastUpload.mimeType);
   };
 
   const handleDownload = () => {
@@ -177,13 +198,13 @@ function App() {
             <div className="mb-6">
               <label 
                 htmlFor="imageUpload" 
-                className={`block w-full cursor-pointer bg-red-50 hover:bg-red-100 border-2 border-dashed ${errorMsg ? 'border-red-600' : 'border-red-400'} text-red-700 text-center py-8 px-4 rounded-xl transition duration-300`}
+                className={`block w-full cursor-pointer bg-red-50 hover:bg-red-100 border-2 border-dashed ${errorMsg ? 'border-red-600' : 'border-red-400'} text-red-700 text-center py-4 px-4 rounded-xl transition duration-300`}
               >
                 <svg className="mx-auto h-12 w-12 mb-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
                 </svg>
                 <span className="text-lg font-bold block">
-                  {errorMsg ? "Gagal memproses. Coba foto lain." : "Upload foto anda Untuk menjadi bagian #stillprabowo"}
+                  {errorMsg ? "Gagal memproses. Coba foto lain." : "Upload foto anda"}
                 </span>
                 <input 
                   type="file" 
@@ -199,7 +220,7 @@ function App() {
 
             {/* Editor/Preview Area */}
             <div className="flex flex-col items-center">
-              <div className="relative w-64 h-64 mb-6 rounded-xl overflow-hidden border-2 border-gray-200 shadow-inner bg-gray-50">
+              <div className="relative w-full aspect-square mb-6 rounded-xl overflow-hidden border-2 border-gray-200 shadow-inner bg-gray-50">
                 
                 {/* Loading Indicator Overlay */}
                 {isProcessing && (
@@ -208,11 +229,10 @@ function App() {
                   </div>
                 )}
 
-                {/* Empty State Overlay */}
                 {!isProcessing && !resultImage && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10">
-                    <span className="text-red-600 font-bold text-center px-2 text-lg">Upload file terlebih dahulu</span>
-                  </div>
+                   <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-10">
+                     <span className="text-red-600 font-bold text-center px-2 text-lg">Upload file terlebih dahulu</span>
+                   </div>
                 )}
                 
                 {/* Canvas (selalu ada) */}
@@ -222,38 +242,40 @@ function App() {
                 />
               </div>
 
-              {/* Download Button */}
-              <button 
-                onClick={handleDownload}
-                disabled={!resultImage || isProcessing} 
-                className={`w-full font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md flex justify-center items-center gap-2 ${
-                  resultImage && !isProcessing 
-                    ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer" 
-                    : "bg-gray-400 text-gray-100 cursor-not-allowed"
-                }`}
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
-                </svg>
-                Download Hasil
-              </button>
-            </div>
-          </div>
+              {/* Retry + Download Buttons */}
+              <div className="flex w-full gap-2">
+                <button
+                  onClick={handleRetry}
+                  disabled={!lastUpload || isProcessing}
+                  aria-label="Ulangi"
+                  title="Ulangi"
+                  className={`aspect-square h-full py-3 px-3 rounded-xl transition duration-300 shadow-md flex items-center justify-center ${
+                    lastUpload && !isProcessing
+                      ? "bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 cursor-pointer"
+                      : "bg-gray-200 border-2 border-gray-300 text-gray-400 cursor-not-allowed"
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
 
-          {/* Footer / Support Section */}
-          <div className="bg-gray-50 p-6 border-t border-gray-200 text-center">
-            <p className="text-gray-600 text-sm mb-3 font-bold">Dukung Program KUALI MERAH PUTIH Untuk Membantu Saudara Kita Yang Membutuhkan</p>
-            <a 
-              href="https://saweria.co/bobonsantoso" 
-              target="_blank" 
-              rel="noopener noreferrer" 
-              className="inline-block w-full bg-white border-2 border-red-600 text-red-600 hover:bg-red-50 font-bold py-3 px-4 rounded-xl transition duration-300 shadow-sm flex items-center justify-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd"></path>
-              </svg>
-              Support KUALI MERAH PUTIH
-            </a>
+                <button 
+                  onClick={handleDownload}
+                  disabled={!resultImage || isProcessing} 
+                  className={`flex-1 font-bold py-3 px-4 rounded-xl transition duration-300 shadow-md flex justify-center items-center gap-2 ${
+                    resultImage && !isProcessing 
+                      ? "bg-red-600 hover:bg-red-700 text-white cursor-pointer" 
+                      : "bg-gray-400 text-gray-100 cursor-not-allowed"
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                  </svg>
+                  Download Hasil
+                </button>
+              </div>
+            </div>
           </div>
 
         </div>
